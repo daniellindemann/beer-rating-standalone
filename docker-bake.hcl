@@ -6,7 +6,8 @@ group "all" {
   targets = [
     "beer-rating-backend",
     "beer-rating-frontend",
-    "beer-rating-console-beerquotes"
+    "beer-rating-console-beerquotes",
+    "beer-rating-backend-migrations",
   ]
 }
 
@@ -25,6 +26,10 @@ variable "FRONTEND_NAMES" {
 
 variable "CONSOLE_NAMES" {
   default = ["beer-rating-console-beerquotes", "daniellindemann/beer-rating-console-beerquotes"]
+}
+
+variable "MIGRATIONS_NAMES" {
+  default = ["beer-rating-backend-migrations", "daniellindemann/beer-rating-backend-migrations"]
 }
 
 target "beer-rating-backend" {
@@ -56,6 +61,18 @@ target "beer-rating-console-beerquotes" {
   dockerfile = "src/Demo.BeerRating.Console.BeerQuotes/Dockerfile"
   tags = flatten([
     for name in CONSOLE_NAMES : [
+      for tag in IMAGE_TAGS : "${name}:${tag}"
+    ]
+  ])
+  platforms = ["linux/amd64", "linux/arm64"]
+  output = ["type=docker"]
+}
+
+target "beer-rating-backend-migrations" {
+  context = "."
+  dockerfile = "src/Demo.BeerRating.Backend/Dockerfile.migrations"
+  tags = flatten([
+    for name in MIGRATIONS_NAMES : [
       for tag in IMAGE_TAGS : "${name}:${tag}"
     ]
   ])

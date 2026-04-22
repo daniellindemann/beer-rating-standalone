@@ -18,6 +18,10 @@ imageConsoleNames=(
     'beer-rating-console-beerquotes'
     'daniellindemann/beer-rating-console-beerquotes'
 )
+imageMigrationsNames=(
+    'beer-rating-backend-migrations'
+    'daniellindemann/beer-rating-backend-migrations'
+)
 imageTags=(
     '10'
     '10.0.103'
@@ -66,6 +70,11 @@ else
     echo '👷‍♂️ Build console container image'
     build_image src/Demo.BeerRating.Console.BeerQuotes/Dockerfile imageConsoleNames imageTags
     echo '🏡 Constructed console container image'
+
+    # build migrations
+    echo '👷‍♂️ Build backend migrations container image'
+    build_image src/Demo.BeerRating.Console.BeerQuotes/Dockerfile.migrations imageMigrationsNames imageTags
+    echo '🏡 Constructed backend migrations container image'
 
     popd
 fi

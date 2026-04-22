@@ -1,0 +1,55 @@
+# 🚨🚨🚨
+# Use bake file in project root to build container image
+
+# ── Stage 1: build migration bundle ──────────────────────────────────────────
+# The bundle is a self-contained executable that applies EF migrations directly.
+# No .NET runtime or external tooling is required in the final image.
+FROM --platform=$BUILDPLATFORM mcr.microsoft.com/dotnet/sdk:10.0-alpine AS build
+ARG TARGETARCH
+ARG configuration=Release
+
+WORKDIR /src
+COPY ["Directory.Packages.props", "./"]
+COPY ["nuget.config", "./"]
+COPY ["dotnet-tools.json", "./"]
+COPY ["src/Demo.BeerRating.Backend/Demo.BeerRating.Backend.csproj", "/src/Demo.BeerRating.Backend/"]
+
+RUN dotnet tool restore
+RUN dotnet restore "/src/Demo.BeerRating.Backend/Demo.BeerRating.Backend.csproj"
+
+COPY ["src/Demo.BeerRating.Backend", "/src/Demo.BeerRating.Backend"]
+WORKDIR "/src/Demo.BeerRating.Backend"
+
+# Determine RID from TARGETARCH if not provided via --build-arg, then:
+#  1. re-run restore with the RID so project.assets.json includes that target
+#  2. build the migration bundle (self-contained, RID-specific)
+# RID can be overridden explicitly via --build-arg RID=linux-x64.
+# Defaults to linux-musl-* to match the Alpine-based final image.
+ARG RID=""
+RUN if [ -z "$RID" ]; then \
+      case "$TARGETARCH" in \
+        amd64) RID=linux-musl-x64 ;; \
+        arm64) RID=linux-musl-arm64 ;; \
+        *) echo "Unsupported arch: $TARGETARCH" && exit 1 ;; \
+      esac; \
+    fi && \
+    dotnet restore "Demo.BeerRating.Backend.csproj" --runtime $RID && \
+    dotnet ef migrations bundle \
+        --configuration $configuration \
+        --self-contained \
+        --context BeerDbContext \
+        --runtime $RID \
+        --output /migrations/efbundle
+
+# ── Stage 2: minimal runtime image – native deps only + the bundle ────────────
+# runtime-deps:alpine provides only the native libraries a .NET self-contained
+# app needs (libssl, libicu, etc.) without the .NET runtime itself (~15 MB).
+FROM mcr.microsoft.com/dotnet/runtime-deps:10.0-alpine
+
+COPY --from=build /migrations/efbundle /migrations/efbundle
+
+# Pass an ADO.NET-style connection string at runtime, e.g.:
+#   -e CONNECTION_STRING="Server=myserver;Database=mydb;User Id=sa;Password=yourStrong(!)Password;"
+ENV CONNECTION_STRING=""
+
+CMD ["sh", "-c", "/migrations/efbundle --connection \"$CONNECTION_STRING\" --verbose"]

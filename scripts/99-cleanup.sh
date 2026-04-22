@@ -9,6 +9,7 @@ image_search_strings=(
     'beer-rating-frontend'
     'beer-rating-backend'
     'beer-rating-console-beerquotes'
+    'beer-rating-backend-migrations'
 )
 
 # find and delete all docker images containing any of the image_search_strings
