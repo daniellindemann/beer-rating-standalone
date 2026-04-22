@@ -46,10 +46,18 @@ RUN if [ -z "$RID" ]; then \
 # app needs (libssl, libicu, etc.) without the .NET runtime itself (~15 MB).
 FROM mcr.microsoft.com/dotnet/runtime-deps:10.0-alpine
 
+# icu-libs is required by Microsoft.Data.SqlClient for globalization support.
+# Alpine sets DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1 by default, which
+# SqlClient does not support. Installing icu-libs and disabling invariant mode fixes this.
+# See: https://github.com/dotnet/SqlClient/issues/2239
+RUN apk add --no-cache icu-libs
+ENV DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false
+
 COPY --from=build /migrations/efbundle /migrations/efbundle
 
-# Pass an ADO.NET-style connection string at runtime, e.g.:
-#   -e CONNECTION_STRING="Server=myserver;Database=mydb;User Id=sa;Password=yourStrong(!)Password;"
+# Pass an ADO.NET-style connection string at runtime:
+#   docker run --rm -e CONNECTION_STRING="Server=myserver;Database=mydb;User Id=sa;Password=pass;" image
 ENV CONNECTION_STRING=""
 
-CMD ["sh", "-c", "/migrations/efbundle --connection \"$CONNECTION_STRING\" --verbose"]
+ENTRYPOINT ["sh", "-c"]
+CMD ["/migrations/efbundle --connection \"$CONNECTION_STRING\" --verbose"]
